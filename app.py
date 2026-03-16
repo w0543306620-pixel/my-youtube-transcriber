@@ -5,7 +5,7 @@ import google.generativeai as genai
 st.title("🎥 מתמלל היוטיוב הקסום שלי")
 
 # כאן המערכת מבקשת את המפתח ששמרנו
-api_key = st.secrets[["GOOGLE_API_KEY"]
+api_key = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=api_key)
 
 # כאן אתה מדביק את ההוראות המדויקות שכתבת ב-AI Studio
