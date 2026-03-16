@@ -1,47 +1,39 @@
 import streamlit as st
 import google.generativeai as genai
 
-# הגדרת כותרת לאתר
-st.title("🎥 מתמלל היוטיוב הקסום שלי")
+# כותרת יפה לאתר
+st.set_page_config(page_title="מתמלל היוטיוב שלי", page_icon="🎥")
+st.title("🎥 מתמלל היוטיוב הקסום")
 
-# כאן המערכת מבקשת את המפתח ששמרנו
-api_key = st.secrets["GOOGLE_API_KEY"]
-genai.configure(api_key=api_key)
+# חיבור למפתח הסודי
+try:
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+except:
+    st.error("אופס! חסר המפתח הסודי (API Key) בהגדרות של Streamlit")
 
-# כאן אתה מדביק את ההוראות המדויקות שכתבת ב-AI Studio
-SYSTEM_PROMPT = """
-שלום.
-אתה מומחה לתמלול. משכתב כמו שאף אחד אחר לא יודע.
-עם ניסיון של למעלה מ 40 שנה, והתמחות בשיעורי תורה.
-אתה יודע לתמלל שיעורי תורה עם הבנה עמוקה של ההקשר והפיסוק.
-אתה שם לב לפרטי פרטים, אם יש מילה שאתה לא יודע, אתה מנסה להסיק מסקנה לפי ההקשר .
-אתה מוציא תחת ידך תמיד קובץ מדהים, מסודר מפוסק ומשוכתב ללא פגם.
-אתה שם כותרות, פסיק נקודה וכו' בצורה מדהימה.
-אתה גם יודע בסוף השכתוב לכתוב סיכום של דף אחד ובו הרעיון המרכזי עם הנקודות העיקריות של השכתוב.
-בנוסף.
-אתה מתמלל מילה במילה ולא מדלג על שום מילה.
-ולכן בסוף אתה מוציא תחת ידך 2 תוצאות.
-הראשונה שהיא שכתוב ועריכה.
-והשנייה תמלול מילה במילה בלי לדלג על שום מילה.
-כמובן 2 הגרסאות יש כותרות, וסימני פיסוק, ובשניהם יש סיכום בסוף.
-האם ברור לך מה עליך לעשות?
-ומי אתה?
-בנוסף, בתמלול אין צורך בחותמת הזמן"""
-
+# כאן שמנו את השם המלא והמדויק של המודל
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=SYSTEM_PROMPT
+    model_name="models/gemini-1.5-flash"
 )
 
 # תיבת טקסט למשתמש
-video_url = st.text_input("הדבק כאן לינק ליוטיוב:")
+video_url = st.text_input("הדבק כאן לינק ליוטיוב (URL):", placeholder="https://www.youtube.com/watch?v=...")
 
-if st.button("תמלל לי!"):
+if st.button("התחל תמלול! ✨"):
     if video_url:
-        with st.spinner("הרובוט מקשיב וכותב..."):
-            # הפעלת המודל
-            response = model.generate_content(video_url)
-            st.markdown("### הנה התמלול שלך:")
-            st.write(response.text)
+        with st.spinner("הרובוט בדרך ליוטיוב, מיד מתחיל לכתוב..."):
+            try:
+                # הוספנו הנחיה קטנה למודל שיבין שמדובר בלינק
+                prompt = f"Please transcribe this YouTube video: {video_url}. If you can't access it directly, explain what you see."
+                
+                response = model.generate_content(prompt)
+                
+                st.success("סיימתי! הנה התוצאה:")
+                st.markdown("---")
+                st.write(response.text)
+                
+            except Exception as e:
+                st.error(f"קרתה תקלה קטנה: {e}")
     else:
-        st.warning("שכחת לשים לינק!")
+        st.warning("בבקשה שים לינק כדי שאוכל להתחיל.")
