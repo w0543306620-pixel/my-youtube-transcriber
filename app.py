@@ -1,71 +1,72 @@
 import streamlit as st
 import google.generativeai as genai
-from youtube_transcript_api import YouTubeTranscriptApi
+import yt_dlp
+import os
+import time
 
-# הגדרות האתר
-st.set_page_config(page_title="מתמלל היוטיוב המנצח", page_icon="🎬")
-st.title("🎬 מתמלל היוטיוב הקסום")
+st.set_page_config(page_title="מתמלל על-חלל", page_icon="🕵️‍♂️")
+st.title("🕵️‍♂️ מתמלל היוטיוב החכם (גרסת העוקף)")
 
-# חיבור למפתח הסודי
+# חיבור ל-API
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=api_key)
 except:
-    st.error("חסר מפתח API בהגדרות!")
+    st.error("חסר מפתח API ב-Secrets!")
 
-# פונקציה שמוציאה את המילים מיוטיוב
-def get_youtube_transcript(url):
-    try:
-        video_id = url.split("v=")[1].split("&")[0]
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['he', 'en'])
-        return " ".join([i['text'] for i in transcript])
-    except Exception as e:
-        return None
+# פונקציה להורדת אודיו בצורה חשאית
+def download_audio(url):
+    ydl_opts = {
+        'format': 'm4a/bestaudio/best',
+        'outtmpl': 'temp_audio.%(ext)s',
+        'quiet': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(info)
 
-# הגדרת המודל - השתמשנו בשם הכי בטוח שלו
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# תיבת הלינק
-video_url = st.text_input("הדבק כאן לינק ליוטיוב:")
+video_url = st.text_input("הדבק לינק ליוטיוב:")
 
-if st.button("תמלל לי בצורה מדהימה! ✨"):
+if st.button("תמלל עכשיו!"):
     if video_url:
-        with st.spinner("הרובוט מוציא את המילים מהסרטון..."):
-            # שלב 1: הוצאת הטקסט הגולמי
-            raw_text = get_youtube_transcript(video_url)
+        audio_file = None
+        try:
+            with st.spinner("מתחפש לדפדפן ומוריד את הסאונד... זה לוקח רגע..."):
+                audio_file = download_audio(video_url)
             
-            if raw_text:
-                st.info("הצלחתי להוציא את המילים! עכשיו Gemini הופך אותן למדהימות...")
-                # שלב 2: שליחה ל-Gemini עם הפרומפט המקורי שלך
-                # כאן תדביק את ה-System Prompt שלך בין המרכאות
-                # כאן אנחנו משתמשים ב-3 מירכאות כדי שנוכל לכתוב טקסט ארוך
-                system_instruction = """
-שלום.
-אתה מומחה לתמלול. משכתב כמו שאף אחד אחר לא יודע.
-עם ניסיון של למעלה מ 40 שנה, והתמחות בשיעורי תורה.
-אתה יודע לתמלל שיעורי תורה עם הבנה עמוקה של ההקשר והפיסוק.
-אתה שם לב לפרטי פרטים, אם יש מילה שאתה לא יודע, אתה מנסה להסיק מסקנה לפי ההקשר .
-אתה מוציא תחת ידך תמיד קובץ מדהים, מסודר מפוסק ומשוכתב ללא פגם.
-אתה שם כותרות, פסיק נקודה וכו' בצורה מדהימה.
-אתה גם יודע בסוף השכתוב לכתוב סיכום של דף אחד ובו הרעיון המרכזי עם הנקודות העיקריות של השכתוב.
-בנוסף.
-אתה מתמלל מילה במילה ולא מדלג על שום מילה.
-ולכן בסוף אתה מוציא תחת ידך 2 תוצאות.
-הראשונה שהיא שכתוב ועריכה.
-והשנייה תמלול מילה במילה בלי לדלג על שום מילה.
-כמובן 2 הגרסאות יש כותרות, וסימני פיסוק, ובשניהם יש סיכום בסוף.
-האם ברור לך מה עליך לעשות?
-ומי אתה?
-בנוסף, בתמלול אין צורך בחותמת הזמן
+            with st.spinner("שולח את האודיו ל-Gemini לניתוח עמוק..."):
+                # העלאת הקובץ לגוגל
+                sample_file = genai.upload_file(path=audio_file)
+                
+                # המתנה קצרה שהקובץ יעובד בגוגל
+                while sample_file.state.name == "PROCESSING":
+                    time.sleep(2)
+                    sample_file = genai.get_file(sample_file.name)
+
+                # כאן הפרומפט המקורי שלך
+                system_prompt = """
+                תדביק כאן את ה-System Instructions שלך מ-AI Studio.
+                תשתמש ב-3 מירכאות כמו שלמדנו!
                 """
                 
-                full_prompt = f"{system_instruction}\n\nהנה הטקסט הגולמי, בצע את התמלול: {raw_text}"
+                response = model.generate_content([sample_file, system_prompt])
                 
-                response = model.generate_content(full_prompt)
-                
-                st.success("הנה התמלול המוכן:")
+                st.success("הנה התמלול המלא (מבוסס שמיעה):")
+                st.markdown("---")
                 st.write(response.text)
-            else:
-                st.error("לא הצלחתי להוציא כתוביות מהסרטון הזה. וודא שיש לו כתוביות ביוטיוב.")
+                
+                # מחיקת הקובץ מהשרת של גוגל אחרי הסיום
+                genai.delete_file(sample_file.name)
+
+        except Exception as e:
+            st.error(f"תקלה במבצע החשאי: {e}")
+        
+        finally:
+            # מחיקת הקובץ הזמני מהמחשב שלנו
+            if audio_file and os.path.exists(audio_file):
+                os.remove(audio_file)
     else:
-        st.warning("שכחת לשים לינק!")
+        st.warning("שים לינק!")
