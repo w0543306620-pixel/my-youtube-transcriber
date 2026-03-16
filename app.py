@@ -1,11 +1,11 @@
 import streamlit as st
 import google.generativeai as genai
-import yt_dlp
-import os
 import time
+import os
 
-st.set_page_config(page_title="מתמלל על-חלל", page_icon="🕵️‍♂️")
-st.title("🕵️‍♂️ מתמלל היוטיוב החכם (גרסת העוקף)")
+st.set_page_config(page_title="מתמלל העל שלי", page_icon="🎙️")
+st.title("🎙️ מתמלל הקבצים המקצועי")
+st.write("מכיוון שיוטיוב חוסמת לינקים, כאן פשוט מעלים את הקובץ וזה עובד 100%!")
 
 # חיבור ל-API
 try:
@@ -14,59 +14,43 @@ try:
 except:
     st.error("חסר מפתח API ב-Secrets!")
 
-# פונקציה להורדת אודיו בצורה חשאית
-def download_audio(url):
-    ydl_opts = {
-        'format': 'm4a/bestaudio/best',
-        'outtmpl': 'temp_audio.%(ext)s',
-        'quiet': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        return ydl.prepare_filename(info)
+# תיבת העלאת קובץ
+uploaded_file = st.file_uploader("בחר קובץ וידאו או אודיו (MP3, MP4, WAV)", type=['mp3', 'mp4', 'wav', 'm4a'])
 
-model = genai.GenerativeModel('gemini-1.5-flash')
-
-video_url = st.text_input("הדבק לינק ליוטיוב:")
-
-if st.button("תמלל עכשיו!"):
-    if video_url:
-        audio_file = None
+if uploaded_file is not None:
+    if st.button("התחל תמלול קסום! ✨"):
         try:
-            with st.spinner("מתחפש לדפדפן ומוריד את הסאונד... זה לוקח רגע..."):
-                audio_file = download_audio(video_url)
-            
-            with st.spinner("שולח את האודיו ל-Gemini לניתוח עמוק..."):
-                # העלאת הקובץ לגוגל
-                sample_file = genai.upload_file(path=audio_file)
+            with st.spinner("מעלה את הקובץ ל-Gemini..."):
+                # שמירה זמנית של הקובץ אצלנו כדי לשלוח לגוגל
+                with open("temp_file", "wb") as f:
+                    f.write(uploaded_file.getbuffer())
                 
-                # המתנה קצרה שהקובץ יעובד בגוגל
-                while sample_file.state.name == "PROCESSING":
+                # שליחה לגוגל
+                google_file = genai.upload_file(path="temp_file")
+                
+                # המתנה לעיבוד
+                while google_file.state.name == "PROCESSING":
                     time.sleep(2)
-                    sample_file = genai.get_file(sample_file.name)
+                    google_file = genai.get_file(google_file.name)
+                
+                st.info("הקובץ מוכן! Gemini מתחיל לתמלל...")
 
-                # כאן הפרומפט המקורי שלך
+                # הפרומפט שלך
                 system_prompt = """
-                תדביק כאן את ה-System Instructions שלך מ-AI Studio.
-                תשתמש ב-3 מירכאות כמו שלמדנו!
+                כאן תדביק את ה-System Instructions שלך מ-AI Studio.
+                להשתמש ב-3 מירכאות!
                 """
                 
-                response = model.generate_content([sample_file, system_prompt])
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content([google_file, system_prompt])
                 
-                st.success("הנה התמלול המלא (מבוסס שמיעה):")
+                st.success("הנה התמלול המלא:")
                 st.markdown("---")
                 st.write(response.text)
                 
-                # מחיקת הקובץ מהשרת של גוגל אחרי הסיום
-                genai.delete_file(sample_file.name)
-
+                # ניקיון
+                genai.delete_file(google_file.name)
+                os.remove("temp_file")
+                
         except Exception as e:
-            st.error(f"תקלה במבצע החשאי: {e}")
-        
-        finally:
-            # מחיקת הקובץ הזמני מהמחשב שלנו
-            if audio_file and os.path.exists(audio_file):
-                os.remove(audio_file)
-    else:
-        st.warning("שים לינק!")
+            st.error(f"קרתה תקלה: {e}")
